@@ -4,12 +4,12 @@ defmodule TelnetChatTest do
   test "echo server" do
     TelnetChat.start(nil, port: 4040)
 
-    {:ok, socket} = :gen_tcp.connect('localhost', 4040, [:binary, packet: :line, active: false, reuseaddr: true])
+    {:ok, pid} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
 
-    :ok = :gen_tcp.send(socket, "hello\n")
+    :ct_telnet_client.send_data(pid, 'hello!')
 
-    {:ok, data} = :gen_tcp.recv(socket, 0)
+    {:ok, response} = :ct_telnet_client.get_data(pid)
 
-    assert data == "hello\n"
+    assert response == 'hello!\n'
   end
 end
