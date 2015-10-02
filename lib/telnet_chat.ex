@@ -32,19 +32,29 @@ defmodule TelnetChat do
   end
 
   defp serve(socket) do
-    socket
-    |> read_line()
-    |> write_line(socket)
+    :gen_tcp.send(socket, "Username: ")
+    {:ok, response} = :gen_tcp.recv(socket, 0)
 
-    serve(socket)
+    name = ignore_telnet_stuff(response) |> String.strip
+
+    serve(socket, name)
   end
 
-  defp read_line(socket) do
-    {:ok, data} = :gen_tcp.recv(socket, 0)
-    data
+  def ignore_telnet_stuff(response) do
+    res = case response do
+      <<255, 253, _>> <> rest -> rest
+      msg -> msg
+    end
+
+    res
   end
 
-  defp write_line(line, socket) do
-    :gen_tcp.send(socket, line)
+  defp serve(socket, name) do
+    :gen_tcp.send(socket, "> ")
+    {:ok, line} = :gen_tcp.recv(socket, 0)
+
+    :gen_tcp.send(socket, "#{name}: #{line}")
+
+    serve(socket, name)
   end
 end

@@ -6,10 +6,20 @@ defmodule TelnetChatTest do
 
     {:ok, pid} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
 
-    :ct_telnet_client.send_data(pid, 'hello!')
+    {:ok, prompt} = :ct_telnet_client.get_data(pid)
 
-    {:ok, response} = :ct_telnet_client.get_data(pid)
+    assert prompt == 'Username: '
 
-    assert response == 'hello!\n'
+    :ok = :ct_telnet_client.send_data(pid, 'max')
+
+    {:ok, prompt} = :ct_telnet_client.get_data(pid)
+
+    assert prompt == '> '
+
+    :ok = :ct_telnet_client.send_data(pid, 'hello!')
+
+    {:ok, prompt} = :ct_telnet_client.get_data(pid)
+
+    assert prompt == 'max: hello!\n> '
   end
 end
