@@ -18,7 +18,7 @@ defmodule TelnetChatTest do
     assert prompt == 'max: hello!\n> '
   end
 
-  test "multiple clients" do
+  test "join messages work" do
     TelnetChat.start(nil, port: 4040)
 
     {:ok, max} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
@@ -39,10 +39,22 @@ defmodule TelnetChatTest do
     {:ok, prompt} = :ct_telnet_client.get_data(joe)
     assert prompt == '> '
 
-    :ok = :ct_telnet_client.send_data(max, 'hello!')
     {:ok, message} = :ct_telnet_client.get_data(max)
-    assert message == 'max: hello!\n> '
+    assert message == 'joe joined.'
+
+    {:ok, alan} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
+
+    {:ok, prompt} = :ct_telnet_client.get_data(alan)
+    assert prompt == 'Username: '
+    :ok = :ct_telnet_client.send_data(alan, 'alan')
+
+    {:ok, prompt} = :ct_telnet_client.get_data(alan)
+    assert prompt == '> '
+
+    {:ok, message} = :ct_telnet_client.get_data(max)
+    assert message == 'alan joined.'
+
     {:ok, message} = :ct_telnet_client.get_data(joe)
-    assert message == 'max: hello!\n> '
+    assert message == 'alan joined.'
   end
 end

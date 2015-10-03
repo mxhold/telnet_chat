@@ -1,4 +1,47 @@
 defmodule TelnetChat do
+  defmodule Forwarder do
+    use GenEvent
+    def handle_event({:join, pid, name}, parent) do
+      if parent != pid do
+        send parent, {:join, name}
+        {:ok, parent}
+      else
+        {:ok, parent}
+      end
+    end
+  end
+
+  defmodule Server do
+    use GenServer
+
+    def start_link(opts \\ []) do
+      GenServer.start_link(__MODULE__, :ok, opts)
+    end
+
+    def register(server, client_pid) do
+      GenServer.call(server, {:register, client_pid})
+    end
+
+    def join(server, pid, name) do
+      GenServer.call(server, {:join, pid, name})
+    end
+
+    def init(:ok) do
+      {:ok, manager} = GenEvent.start_link
+      {:ok, %{manager: manager}}
+    end
+
+    def handle_call({:register, client_pid}, _from, state) do
+      GenEvent.add_handler(state[:manager], {Forwarder, client_pid}, client_pid)
+      {:reply, :ok, state}
+    end
+
+    def handle_call({:join, pid, name}, _from, state) do
+      GenEvent.sync_notify(state[:manager], {:join, pid, name})
+      {:reply, :ok, state}
+    end
+  end
+
   use Application
 
   @doc false
@@ -7,7 +50,8 @@ defmodule TelnetChat do
 
     children = [
       supervisor(Task.Supervisor, [[name: TelnetChat.TaskSupervisor]]),
-      worker(Task, [TelnetChat, :accept, [port]])
+      worker(Task, [TelnetChat, :accept, [port]]),
+      worker(TelnetChat.Server, [[name: TelnetChat.ChatServer]])
     ]
 
     opts = [strategy: :one_for_one, name: TelnetChat.Supervisor]
@@ -27,6 +71,7 @@ defmodule TelnetChat do
   defp loop_acceptor(socket) do
     {:ok, client} = :gen_tcp.accept(socket)
     {:ok, pid} = Task.Supervisor.start_child(TelnetChat.TaskSupervisor, fn -> serve(client) end)
+    TelnetChat.Server.register(TelnetChat.ChatServer, pid)
     :ok = :gen_tcp.controlling_process(client, pid)
     loop_acceptor(socket)
   end
@@ -36,6 +81,10 @@ defmodule TelnetChat do
     {:ok, response} = :gen_tcp.recv(socket, 0)
 
     name = ignore_telnet_stuff(response) |> String.strip
+
+    TelnetChat.Server.join(TelnetChat.ChatServer, self, name)
+
+    :gen_tcp.send(socket, "> ")
 
     serve(socket, name)
   end
@@ -50,10 +99,16 @@ defmodule TelnetChat do
   end
 
   defp serve(socket, name) do
-    :gen_tcp.send(socket, "> ")
-    {:ok, line} = :gen_tcp.recv(socket, 0)
+    receive do
+      {:join, name} -> :gen_tcp.send(socket, "#{name} joined.")
+      _ -> nil
+    after 0 -> nil
+    end
 
-    :gen_tcp.send(socket, "#{name}: #{line}")
+    case :gen_tcp.recv(socket, 0, 10) do
+      {:ok, line} -> :gen_tcp.send(socket, "#{name}: #{line}\n> ")
+      {:error, :timeout} -> nil
+    end
 
     serve(socket, name)
   end
