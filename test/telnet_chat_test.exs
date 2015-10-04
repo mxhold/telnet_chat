@@ -1,7 +1,7 @@
 defmodule TelnetChatTest do
   use ExUnit.Case
 
-  test "join messages work" do
+  test "chat works" do
     TelnetChat.start(nil, port: 4040)
 
     {:ok, max} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
@@ -43,5 +43,16 @@ defmodule TelnetChatTest do
 
     {:ok, message} = :ct_telnet_client.get_data(joe)
     assert message == '\r  \ralan joined.\r\n> '
+
+    :ok = :ct_telnet_client.send_data(max, '\r\n', false)
+
+    {:ok, message} = :ct_telnet_client.get_data(max)
+    assert message == '\r  \rmax: hello this is my message\r\n> '
+
+    {:ok, message} = :ct_telnet_client.get_data(joe)
+    assert message == '\r  \rmax: hello this is my message\r\n> '
+
+    {:ok, message} = :ct_telnet_client.get_data(alan)
+    assert message == '\r  \rmax: hello this is my message\r\n> '
   end
 end
