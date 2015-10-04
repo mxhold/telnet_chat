@@ -83,11 +83,23 @@ defmodule TelnetChat do
     loop_acceptor(socket)
   end
 
+  # Telnet codes
+  @tn_ECHO <<1>>
+  @tn_SUPPRESS_GO_AHEAD <<3>>
+  @tn_LINEMODE <<34>>
+
+  @tn_WILL <<251>>
+  @tn_WONT <<252>>
+  @tn_DO <<253>>
+  @tn_DONT <<254>>
+
+  @tn_IAC <<255>>
+
   defp serve(socket) do
     :gen_tcp.send(socket, "Username: ")
     {:ok, response} = :gen_tcp.recv(socket, 0)
 
-    if response == <<255, 253, 3>> do
+    if response == @tn_IAC <> @tn_DO <> @tn_SUPPRESS_GO_AHEAD do
       {:ok, response} = :gen_tcp.recv(socket, 0)
     end
 
@@ -95,11 +107,8 @@ defmodule TelnetChat do
 
     TelnetChat.Server.join(TelnetChat.ChatServer, name)
 
-    :gen_tcp.send(socket, <<255, 254, 1>>) # DONT ECHO
-    :gen_tcp.send(socket, <<255, 251, 1>>) # WILL ECHO
-    :gen_tcp.send(socket, <<255, 251, 3>>) # WILL SUPPRESS GO AHEAD
-    :gen_tcp.send(socket, <<255, 254, 34>>) # DONT LINEMODE
-    :gen_tcp.send(socket, <<255, 252, 34>>) # WONT LINEMODE
+    turn_on_character_mode(socket)
+
     :gen_tcp.send(socket, "> ")
 
     serve(socket, name)
@@ -107,9 +116,17 @@ defmodule TelnetChat do
 
   def ignore_telnet_stuff(response) do
     case response do
-      <<255, _, _>> <> rest -> rest
+      @tn_IAC <> <<_, _>> <> rest -> rest
       msg -> msg
     end
+  end
+
+  defp turn_on_character_mode(socket) do
+    :gen_tcp.send(socket, @tn_IAC <> @tn_DONT <> @tn_ECHO)
+    :gen_tcp.send(socket, @tn_IAC <> @tn_WILL <> @tn_ECHO)
+    :gen_tcp.send(socket, @tn_IAC <> @tn_WILL <> @tn_SUPPRESS_GO_AHEAD)
+    :gen_tcp.send(socket, @tn_IAC <> @tn_DONT <> @tn_LINEMODE)
+    :gen_tcp.send(socket, @tn_IAC <> @tn_WONT <> @tn_LINEMODE)
   end
 
   defp clear(length) do
