@@ -126,7 +126,7 @@ defmodule TelnetChat do
   defp serve(socket, name, buffer \\ "") do
     receive do
       {:join, name} -> :gen_tcp.send(socket, "#{clear(String.length(buffer) + 2)}\r#{name} joined.\r\n> #{buffer}")
-      {:say, name, message} -> :gen_tcp.send(socket, "\r#{name}: #{message}\r\n> #{buffer}")
+      {:say, name, message} -> :gen_tcp.send(socket, "#{clear(String.length(buffer) + 2)}\r#{name}: #{message}\r\n> #{buffer}")
       _ -> nil
     after 0 -> nil
     end
@@ -135,14 +135,17 @@ defmodule TelnetChat do
       {:ok, "\r"} ->
         TelnetChat.Server.say(TelnetChat.ChatServer, self, name, buffer)
         buffer = ""
-      {:ok, "\d"} ->
+      {:ok, "\d"} -> # backspace
         buffer = buffer |> String.slice(0..-2)
-        :gen_tcp.send(socket, "\r> #{buffer}")
+        :gen_tcp.send(socket, "#{clear(String.length(buffer) + 3)}\r> #{buffer}")
+      {:ok, <<27>>} -> # ignore next 2 bytes after escape
+        :gen_tcp.recv(socket, 2)
       {:ok, char} ->
         if char > <<31>> && char < <<127>> do
+          #IO.puts inspect char
           :gen_tcp.send(socket, char)
+          buffer = buffer <> char
         end
-        buffer = buffer <> char
       {:error, :timeout} -> nil
     end
 
