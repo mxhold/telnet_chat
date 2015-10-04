@@ -27,22 +27,24 @@ defmodule TelnetChat do
       GenServer.call(server, {:join, name})
     end
 
-    def say(server, name, message) do
-      GenServer.call(server, {:say, name, message})
+    def say(server, message) do
+      GenServer.call(server, {:say, message})
     end
 
     def init(:ok) do
       {:ok, manager} = GenEvent.start_link
-      {:ok, %{manager: manager}}
+      {:ok, %{manager: manager, names: HashDict.new}}
     end
 
     def handle_call({:join, name}, {pid, _}, state) do
+      state = Dict.update!(state, :names, fn(names) -> names |> HashDict.put(pid, name) end)
       GenEvent.add_handler(state[:manager], {Forwarder, pid}, pid)
       GenEvent.sync_notify(state[:manager], {:join, pid, name})
       {:reply, :ok, state}
     end
 
-    def handle_call({:say, name, message}, _from, state) do
+    def handle_call({:say, message}, {pid, _}, state) do
+      name = state[:names] |> HashDict.fetch!(pid)
       GenEvent.sync_notify(state[:manager], {:say, name, message})
       {:reply, :ok, state}
     end
@@ -124,7 +126,7 @@ defmodule TelnetChat do
 
     case :gen_tcp.recv(socket, 1, 0) do
       {:ok, "\r"} ->
-        TelnetChat.Server.say(TelnetChat.ChatServer, name, buffer)
+        TelnetChat.Server.say(TelnetChat.ChatServer, buffer)
         buffer = ""
       {:ok, "\d"} -> # backspace
         buffer = buffer |> String.slice(0..-2)
