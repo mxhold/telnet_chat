@@ -94,6 +94,10 @@ defmodule TelnetChat do
     :gen_tcp.send(socket, "Username: ")
     {:ok, response} = :gen_tcp.recv(socket, 0)
 
+    if response == <<255, 253, 3>> do
+      {:ok, response} = :gen_tcp.recv(socket, 0)
+    end
+
     name = ignore_telnet_stuff(response) |> String.strip
 
     TelnetChat.Server.join(TelnetChat.ChatServer, self, name)
@@ -115,15 +119,19 @@ defmodule TelnetChat do
     end
   end
 
+  defp clear(length) do
+    "\r#{String.duplicate(" ", length)}"
+  end
+
   defp serve(socket, name, buffer \\ "") do
     receive do
-      {:join, name} -> :gen_tcp.send(socket, "\r#{name} joined.\r\n> #{buffer}")
+      {:join, name} -> :gen_tcp.send(socket, "#{clear(String.length(buffer) + 2)}\r#{name} joined.\r\n> #{buffer}")
       {:say, name, message} -> :gen_tcp.send(socket, "\r#{name}: #{message}\r\n> #{buffer}")
       _ -> nil
     after 0 -> nil
     end
 
-    case :gen_tcp.recv(socket, 1, 10) do
+    case :gen_tcp.recv(socket, 1, 0) do
       {:ok, "\r"} ->
         TelnetChat.Server.say(TelnetChat.ChatServer, self, name, buffer)
         buffer = ""
@@ -131,7 +139,6 @@ defmodule TelnetChat do
         buffer = buffer |> String.slice(0..-2)
         :gen_tcp.send(socket, "\r> #{buffer}")
       {:ok, char} ->
-        IO.puts inspect char
         if char > <<31>> && char < <<127>> do
           :gen_tcp.send(socket, char)
         end
