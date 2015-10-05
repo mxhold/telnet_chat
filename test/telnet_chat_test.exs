@@ -15,7 +15,7 @@ defmodule TelnetChatTest do
 
     # start typing so we check that the join message overwrites and then
     # reprints the current line
-    :ok = :ct_telnet_client.send_data(max, 'hello this is my message', false)
+    :ok = :ct_telnet_client.send_data(max, 'helx\dlo this is my message', false)
 
     {:ok, joe} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
 
@@ -27,7 +27,7 @@ defmodule TelnetChatTest do
     assert prompt == '> '
 
     {:ok, message} = :ct_telnet_client.get_data(max)
-    assert message == 'hello this is my message\r                          \rjoe joined.\r\n> hello this is my message'
+    assert message == 'helx\r      \r> hello this is my message\r                           \rjoe joined.\r\n> hello this is my message'
 
     {:ok, alan} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
 
@@ -39,20 +39,20 @@ defmodule TelnetChatTest do
     assert prompt == '> '
 
     {:ok, message} = :ct_telnet_client.get_data(max)
-    assert message == '\r                          \ralan joined.\r\n> hello this is my message'
+    assert message == '\r                           \ralan joined.\r\n> hello this is my message'
 
     {:ok, message} = :ct_telnet_client.get_data(joe)
-    assert message == '\r  \ralan joined.\r\n> '
+    assert message == '\r   \ralan joined.\r\n> '
 
     :ok = :ct_telnet_client.send_data(max, '\r\n', false)
 
     {:ok, message} = :ct_telnet_client.get_data(max)
-    assert message == '\r  \rmax: hello this is my message\r\n> '
+    assert message == '\r   \rmax: hello this is my message\r\n> '
 
     {:ok, message} = :ct_telnet_client.get_data(joe)
-    assert message == '\r  \rmax: hello this is my message\r\n> '
+    assert message == '\r   \rmax: hello this is my message\r\n> '
 
     {:ok, message} = :ct_telnet_client.get_data(alan)
-    assert message == '\r  \rmax: hello this is my message\r\n> '
+    assert message == '\r   \rmax: hello this is my message\r\n> '
   end
 end
