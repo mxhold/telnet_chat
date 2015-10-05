@@ -46,6 +46,7 @@ defmodule TelnetChat do
     def handle_call({:say, message}, {pid, _}, state) do
       name = state[:names] |> HashDict.fetch!(pid)
       GenEvent.sync_notify(state[:manager], {:say, name, message})
+      IO.puts "#{name}: #{message}"
       {:reply, :ok, state}
     end
   end
@@ -106,6 +107,7 @@ defmodule TelnetChat do
     name = ignore_telnet_stuff(response) |> String.strip
 
     TelnetChat.Server.join(TelnetChat.ChatServer, name)
+    IO.puts "#{name} joined."
 
     turn_on_character_mode(socket)
 
