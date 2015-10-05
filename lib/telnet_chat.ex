@@ -1,4 +1,6 @@
 defmodule TelnetChat do
+  require Logger
+
   defmodule ChatEvents do
     use GenEvent
     def handle_event({:join, pid, name}, parent) do
@@ -12,6 +14,11 @@ defmodule TelnetChat do
 
     def handle_event({:say, name, message}, parent) do
       send parent, {:say, name, message}
+      {:ok, parent}
+    end
+
+    def handle_event({:part, name}, parent) do
+      send parent, {:part, name}
       {:ok, parent}
     end
   end
@@ -31,6 +38,10 @@ defmodule TelnetChat do
       GenServer.call(server, {:say, message})
     end
 
+    def part(server) do
+      GenServer.call(server, :part)
+    end
+
     def init(:ok) do
       {:ok, manager} = GenEvent.start_link
       {:ok, %{manager: manager, names: HashDict.new}}
@@ -46,7 +57,13 @@ defmodule TelnetChat do
     def handle_call({:say, message}, {pid, _}, state) do
       name = state[:names] |> HashDict.fetch!(pid)
       GenEvent.sync_notify(state[:manager], {:say, name, message})
-      IO.puts "#{name}: #{message}"
+      {:reply, :ok, state}
+    end
+
+    def handle_call(:part, {pid, _}, state) do
+      name = Dict.fetch!(state[:names], pid)
+      state = Dict.update!(state, :names, fn(names) -> Dict.delete(names, pid) end)
+      GenEvent.sync_notify(state[:manager], {:part, name})
       {:reply, :ok, state}
     end
   end
@@ -72,13 +89,21 @@ defmodule TelnetChat do
   """
   def accept(port) do
     {:ok, socket} = :gen_tcp.listen(port, [:binary, packet: :raw, active: false, reuseaddr: true])
-    IO.puts "Accepting connections on port #{port}"
+    Logger.info "Accepting connections on port #{port}"
     loop_acceptor(socket)
   end
 
   defp loop_acceptor(socket) do
     {:ok, client} = :gen_tcp.accept(socket)
-    {:ok, pid} = Task.Supervisor.start_child(TelnetChat.TaskSupervisor, fn -> serve(client) end)
+    {:ok, pid} = Task.Supervisor.start_child(TelnetChat.TaskSupervisor, fn ->
+      Logger.metadata(ip: ip(client))
+      Logger.debug "connection open"
+      try do
+        serve(client)
+      catch
+        :exit, "closed" -> Logger.debug "connection closed"
+      end
+    end)
     :ok = :gen_tcp.controlling_process(client, pid)
     loop_acceptor(socket)
   end
@@ -107,7 +132,7 @@ defmodule TelnetChat do
     name = ignore_telnet_stuff(response) |> String.strip
 
     TelnetChat.Server.join(TelnetChat.ChatServer, name)
-    IO.puts "#{name} joined."
+    Logger.info "#{name} joined."
 
     turn_on_character_mode(socket)
 
@@ -143,28 +168,40 @@ defmodule TelnetChat do
     receive do
       {:join, name}         -> send_and_reprint_buffer(socket, buffer, "#{name} joined.\r\n")
       {:say, name, message} -> send_and_reprint_buffer(socket, buffer, "#{name}: #{message}\r\n")
+      {:part, name}         -> send_and_reprint_buffer(socket, buffer, "#{name} left.\r\n")
       _ -> nil
     after 0 -> nil
     end
 
     case :gen_tcp.recv(socket, 1, 0) do
       {:ok, "\r"} ->
+        Logger.info "#{name}: #{buffer}"
         TelnetChat.Server.say(TelnetChat.ChatServer, buffer)
         buffer = ""
       {:ok, "\d"} -> # backspace
         buffer = String.slice(buffer, 0..-2)
         send_and_reprint_buffer(socket, buffer, "")
       {:ok, <<27>>} -> # ignore next 2 bytes after escape
-        :gen_tcp.recv(socket, 2)
+        {:ok, ignored_bytes} = :gen_tcp.recv(socket, 2)
+        Logger.warn "Ignored escaped bytes: #{inspect ignored_bytes}"
       {:ok, char} ->
         if char > <<31>> && char < <<127>> do
-          #IO.puts inspect char
+          Logger.debug inspect(char)
           :gen_tcp.send(socket, char)
           buffer = buffer <> char
         end
       {:error, :timeout} -> nil
+      {:error, :closed} ->
+        Logger.info "#{name} left."
+        TelnetChat.Server.part(TelnetChat.ChatServer)
+        exit("closed")
     end
 
     serve(socket, name, buffer |> ignore_telnet_stuff)
+  end
+
+  def ip(socket) do
+    {:ok, {ip, _}} = :inet.peername(socket)
+    ip |> Tuple.to_list |> Enum.join(".")
   end
 end
