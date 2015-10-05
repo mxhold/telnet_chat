@@ -1,5 +1,5 @@
 defmodule TelnetChat do
-  defmodule Forwarder do
+  defmodule ChatEvents do
     use GenEvent
     def handle_event({:join, pid, name}, parent) do
       if parent != pid do
@@ -38,7 +38,7 @@ defmodule TelnetChat do
 
     def handle_call({:join, name}, {pid, _}, state) do
       state = Dict.update!(state, :names, fn(names) -> names |> HashDict.put(pid, name) end)
-      GenEvent.add_handler(state[:manager], {Forwarder, pid}, pid)
+      GenEvent.add_handler(state[:manager], {ChatEvents, pid}, pid)
       GenEvent.sync_notify(state[:manager], {:join, pid, name})
       {:reply, :ok, state}
     end
@@ -70,8 +70,7 @@ defmodule TelnetChat do
   Starts accepting connections on the given `port`.
   """
   def accept(port) do
-    {:ok, socket} = :gen_tcp.listen(port,
-                      [:binary, packet: :raw, active: false, reuseaddr: true])
+    {:ok, socket} = :gen_tcp.listen(port, [:binary, packet: :raw, active: false, reuseaddr: true])
     IO.puts "Accepting connections on port #{port}"
     loop_acceptor(socket)
   end
@@ -84,6 +83,7 @@ defmodule TelnetChat do
   end
 
   # Telnet codes
+
   @tn_ECHO <<1>>
   @tn_SUPPRESS_GO_AHEAD <<3>>
   @tn_LINEMODE <<34>>
