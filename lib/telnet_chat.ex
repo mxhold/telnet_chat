@@ -133,10 +133,14 @@ defmodule TelnetChat do
     "\r#{String.duplicate(" ", length)}"
   end
 
+  defp send_and_reprint_buffer(socket, buffer, message) do
+    :gen_tcp.send(socket, "#{clear(String.length(buffer) + 3)}\r#{message}> #{buffer}")
+  end
+
   defp serve(socket, name, buffer \\ "") do
     receive do
-      {:join, name} -> :gen_tcp.send(socket, "#{clear(String.length(buffer) + 2)}\r#{name} joined.\r\n> #{buffer}")
-      {:say, name, message} -> :gen_tcp.send(socket, "#{clear(String.length(buffer) + 2)}\r#{name}: #{message}\r\n> #{buffer}")
+      {:join, name}         -> send_and_reprint_buffer(socket, buffer, "#{name} joined.\r\n")
+      {:say, name, message} -> send_and_reprint_buffer(socket, buffer, "#{name}: #{message}\r\n")
       _ -> nil
     after 0 -> nil
     end
@@ -146,8 +150,8 @@ defmodule TelnetChat do
         TelnetChat.Server.say(TelnetChat.ChatServer, buffer)
         buffer = ""
       {:ok, "\d"} -> # backspace
-        buffer = buffer |> String.slice(0..-2)
-        :gen_tcp.send(socket, "#{clear(String.length(buffer) + 3)}\r> #{buffer}")
+        buffer = String.slice(buffer, 0..-2)
+        send_and_reprint_buffer(socket, buffer, "")
       {:ok, <<27>>} -> # ignore next 2 bytes after escape
         :gen_tcp.recv(socket, 2)
       {:ok, char} ->
