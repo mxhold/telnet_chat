@@ -7,11 +7,11 @@ defmodule TelnetChatTest do
     {:ok, max} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
 
     {:ok, prompt} = :ct_telnet_client.get_data(max)
-    assert prompt == 'Username: '
+    assert prompt == 'Name: '
     :ok = :ct_telnet_client.send_data(max, 'max')
 
     {:ok, prompt} = :ct_telnet_client.get_data(max)
-    assert prompt == '> '
+    assert prompt == 'You are alone.\r\n> '
 
     # start typing so we check that the join message overwrites and then
     # reprints the current line
@@ -20,11 +20,11 @@ defmodule TelnetChatTest do
     {:ok, joe} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
 
     {:ok, prompt} = :ct_telnet_client.get_data(joe)
-    assert prompt == 'Username: '
+    assert prompt == 'Name: '
     :ok = :ct_telnet_client.send_data(joe, 'joe')
 
     {:ok, prompt} = :ct_telnet_client.get_data(joe)
-    assert prompt == '> '
+    assert prompt == 'There is one other person here: max.\r\n> '
 
     {:ok, message} = :ct_telnet_client.get_data(max)
     assert message == 'helx\r      \r> hello this is my message\r                           \rjoe joined.\r\n> hello this is my message'
@@ -32,11 +32,11 @@ defmodule TelnetChatTest do
     {:ok, alan} = :ct_telnet_client.open('localhost', 4040, :telnet_conn)
 
     {:ok, prompt} = :ct_telnet_client.get_data(alan)
-    assert prompt == 'Username: '
+    assert prompt == 'Name: '
     :ok = :ct_telnet_client.send_data(alan, 'alan')
 
     {:ok, prompt} = :ct_telnet_client.get_data(alan)
-    assert prompt == '> '
+    assert prompt == 'There are 2 other people here: max and joe.\r\n> '
 
     {:ok, message} = :ct_telnet_client.get_data(max)
     assert message == '\r                           \ralan joined.\r\n> hello this is my message'
