@@ -40,29 +40,6 @@ defmodule TelnetChat.Client do
     loop_server(socket, name)
   end
 
-  def ignore_telnet_stuff(response) do
-    case response do
-      @telnet_IAC <> <<_, _>> <> rest -> rest
-      msg -> msg
-    end
-  end
-
-  defp turn_on_character_mode(socket) do
-    :gen_tcp.send(socket, @telnet_IAC <> @telnet_DONT <> @telnet_ECHO)
-    :gen_tcp.send(socket, @telnet_IAC <> @telnet_WILL <> @telnet_ECHO)
-    :gen_tcp.send(socket, @telnet_IAC <> @telnet_WILL <> @telnet_SUPPRESS_GO_AHEAD)
-    :gen_tcp.send(socket, @telnet_IAC <> @telnet_DONT <> @telnet_LINEMODE)
-    :gen_tcp.send(socket, @telnet_IAC <> @telnet_WONT <> @telnet_LINEMODE)
-  end
-
-  defp clear(length) do
-    "\r#{String.duplicate(" ", length)}"
-  end
-
-  defp send_and_reprint_buffer(socket, buffer, message) do
-    :gen_tcp.send(socket, "#{clear(String.length(buffer) + 3)}\r#{message}> #{buffer}")
-  end
-
   defp loop_server(socket, name, buffer \\ "") do
     receive do
       {:join, name}         -> send_and_reprint_buffer(socket, buffer, "#{name} joined.\r\n")
@@ -97,5 +74,28 @@ defmodule TelnetChat.Client do
     end
 
     loop_server(socket, name, buffer |> ignore_telnet_stuff)
+  end
+
+  defp ignore_telnet_stuff(response) do
+    case response do
+      @telnet_IAC <> <<_, _>> <> rest -> rest
+      msg -> msg
+    end
+  end
+
+  defp turn_on_character_mode(socket) do
+    :gen_tcp.send(socket, @telnet_IAC <> @telnet_DONT <> @telnet_ECHO)
+    :gen_tcp.send(socket, @telnet_IAC <> @telnet_WILL <> @telnet_ECHO)
+    :gen_tcp.send(socket, @telnet_IAC <> @telnet_WILL <> @telnet_SUPPRESS_GO_AHEAD)
+    :gen_tcp.send(socket, @telnet_IAC <> @telnet_DONT <> @telnet_LINEMODE)
+    :gen_tcp.send(socket, @telnet_IAC <> @telnet_WONT <> @telnet_LINEMODE)
+  end
+
+  defp clear(length) do
+    "\r#{String.duplicate(" ", length)}"
+  end
+
+  defp send_and_reprint_buffer(socket, buffer, message) do
+    :gen_tcp.send(socket, "#{clear(String.length(buffer) + 3)}\r#{message}> #{buffer}")
   end
 end
