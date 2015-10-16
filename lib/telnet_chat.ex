@@ -2,12 +2,15 @@ defmodule TelnetChat do
   require Logger
   use Application
 
+  @manager_name TelnetChat.EventManager
+
   @doc false
   def start(_type, port: port) do
     import Supervisor.Spec
 
     children = [
-      worker(TelnetChat.Server, [[name: TelnetChat.ChatServer]]),
+      worker(GenEvent, [[name: @manager_name]]),
+      worker(TelnetChat.Server, [@manager_name, [name: TelnetChat.ChatServer]]),
       supervisor(Task.Supervisor, [[name: TelnetChat.TaskSupervisor]]),
       worker(Task, [TelnetChat, :accept, [port]]),
     ]

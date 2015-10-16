@@ -1,8 +1,8 @@
 defmodule TelnetChat.Server do
   use GenServer
 
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, :ok, opts)
+  def start_link(event_manager, opts \\ []) do
+    GenServer.start_link(__MODULE__, event_manager, opts)
   end
 
   def join(server, name) do
@@ -17,9 +17,10 @@ defmodule TelnetChat.Server do
     GenServer.call(server, :part)
   end
 
-  def init(:ok) do
-    {:ok, manager} = GenEvent.start_link
-    {:ok, %{manager: manager, names: HashDict.new}}
+  # GenServer callbacks
+
+  def init(event_manager) do
+    {:ok, %{manager: event_manager, names: HashDict.new}}
   end
 
   def handle_call({:join, name}, {pid, _}, state) do
