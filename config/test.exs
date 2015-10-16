@@ -11,7 +11,7 @@ use Mix.Config
 # Sample configuration:
 #
      config :logger, :console,
-       level: :debug,
+       level: :info,
        format: "$date $time [$level] $metadata$message\n",
        metadata: [:ip]
 
