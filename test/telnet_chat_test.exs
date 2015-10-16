@@ -36,7 +36,7 @@ defmodule TelnetChatTest do
     :ok = :ct_telnet_client.send_data(alan, 'alan')
 
     {:ok, prompt} = :ct_telnet_client.get_data(alan)
-    assert prompt == 'There are 2 other people here: max and joe.\r\n> '
+    assert prompt == 'There are 2 other people here: joe and max.\r\n> '
 
     {:ok, message} = :ct_telnet_client.get_data(max)
     assert message == '\r                           \ralan joined.\r\n> hello this is my message'

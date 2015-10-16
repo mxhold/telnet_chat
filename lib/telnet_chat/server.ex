@@ -24,7 +24,7 @@ defmodule TelnetChat.Server do
   end
 
   def handle_call({:join, name}, {pid, _}, state) do
-    names = state[:names] |> Dict.values
+    names = state[:names] |> Dict.values |> Enum.sort
     state = Dict.update!(state, :names, fn(names) -> names |> HashDict.put(pid, name) end)
     GenEvent.add_handler(state[:manager], {TelnetChat.ChatEvents, pid}, pid)
     GenEvent.sync_notify(state[:manager], {:join, pid, name})
