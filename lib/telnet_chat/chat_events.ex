@@ -1,12 +1,11 @@
 defmodule TelnetChat.ChatEvents do
   use GenEvent
+
   def handle_event({:join, pid, name}, parent) do
     if parent != pid do
       send parent, {:join, name}
-      {:ok, parent}
-    else
-      {:ok, parent}
     end
+    {:ok, parent}
   end
 
   def handle_event({:say, name, message}, parent) do
